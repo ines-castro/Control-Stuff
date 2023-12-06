@@ -9,16 +9,16 @@ ts = 1e-4;
 times = (0:ts:50)';
 
 % Simulation parameters
-a = 2;
+a = 5;
 pd = @(t) [a*sqrt(2)*cos(t)./(sin(t).^2+1);...
             a*sqrt(2)*cos(t).*sin(t)./(sin(t).^2+1)];
 
 % syms t; pd(t) % derivatives computed symbolocally
-pd_dot = @(t) [                                        - (2*2^(1/2).*sin(t))./(sin(t).^2 + 1) - (4*2.^(1/2)*cos(t).^2.*sin(t))./(sin(t).^2 + 1).^2;
-                (2*2.^(1/2).*cos(t).^2)./(sin(t).^2 + 1) - (2*2.^(1/2).*sin(t).^2)./(sin(t).^2 + 1) - (4*2.^(1/2).*cos(t).^2.*sin(t).^2)./(sin(t).^2 + 1).^2];
+pd_dot = @(t) [                                        - (2.^(1/2).*a.*sin(t))/(sin(t).^2 + 1) - (2*2.^(1/2).*a.*cos(t).^2.*sin(t))/(sin(t).^2 + 1).^2;
+                (2.^(1/2).*a.*cos(t).^2)/(sin(t).^2 + 1) - (2.^(1/2).*a.*sin(t).^2)/(sin(t).^2 + 1) - (2.*2.^(1/2).*a.*cos(t).^2.*sin(t).^2)/(sin(t).^2 + 1).^2];
 
-pd_ddot = @(t) [    (16.*2.^(1/2).*cos(t).^3.*sin(t).^2)./(sin(t).^2 + 1).^3 - (4*2.^(1/2).*cos(t).^3)./(sin(t).^2 + 1).^2 - (2*2.^(1/2).*cos(t))./(sin(t).^2 + 1) + (12*2.^(1/2).*cos(t).*sin(t).^2)./(sin(t).^2 + 1).^2; 
-                    (16*2.^(1/2).*cos(t).^3.*sin(t).^3)./(sin(t).^2 + 1).^3 - (8*2.^(1/2).*cos(t).*sin(t))./(sin(t).^2 + 1) + (12*2.^(1/2).*cos(t).*sin(t).^3)./(sin(t).^2 + 1).^2 - (12*2.^(1/2).*cos(t).^3.*sin(t))./(sin(t).^2 + 1).^2];
+pd_ddot = @(t) [    (6*2.^(1/2).*a.*cos(t).*sin(t).^2)/(sin(t).^2 + 1).^2 - (2.^(1/2).*a.*cos(t))/(sin(t).^2 + 1) - (2*2.^(1/2).*a.*cos(t).^3)/(sin(t).^2 + 1).^2 + (8*2.^(1/2).*a.*cos(t).^3.*sin(t).^2)/(sin(t).^2 + 1).^3; 
+                   (6*2.^(1/2).*a.*cos(t).*sin(t).^3)/(sin(t).^2 + 1).^2 - (6*2.^(1/2).*a.*cos(t).^3.*sin(t))/(sin(t).^2 + 1).^2 + (8.*2.^(1/2).*a.*cos(t).^3.*sin(t).^3)/(sin(t).^2 + 1).^3 - (4*2.^(1/2).*a.*cos(t).*sin(t))/(sin(t).^2 + 1)];
 
 % Curvature
 k = @(t)  ([1;0]'*pd_dot(t).*[0;1]'*pd_ddot(t) - [1;0]'*pd_ddot(t).*[0;1]'*pd_dot(t))/(sqrt(sum(pd_dot(t).*pd_dot(t),1))).^3;
@@ -31,11 +31,6 @@ R_dot = @(t) [ -sin(t) cos(t);
 % Skew matrix
 S = @(rp) [0 -rp;
            rp 0];
-% R from P to I
-R2 = @(t) [ cos(t)  -sin(t); 
-            sin(t)  cos(t)];
-R2_dot = @(t) [-sin(t) -cos(t);
-                cos(t) -sin(t)];
 
 theta = 0.2;
 k_delta = 1;
@@ -44,24 +39,21 @@ delta = @(y1, u) -theta * tanh(k_delta * y1 .* u);
 %delta_dot = @(y1, y1_dot, u, u_dot) -theta * k_delta * (1 - (y1_dot.*u + y1.*u_dot) .* tanh(k_delta .* y1 .* u).^2);
 delta_dot = @(y1, y1_dot, u, u_dot) -k_delta * theta * (sech(k_delta * y1 .* u)).^2 .* (y1_dot .* u + y1 .* u_dot);
 
-k1 = 0.11;
-k2 = 0.22;
-k3 = 0.33;
-
-% k1 = 0.05;
-% k2 = 0.5;
-% k3 = 2;
+k1 = 10;
+k2 = 5;
+k3 = 0.5;
 
 %% Algorithm 
 
-x = 3;
-y = 1;
+x = 7;
+y = 4;
 psi = pi/4;
 
 % initial inputs
-gamma = 0.5;
+gamma = 0.8;
+gamma0 = gamma;
 gamma_dot = 0;
-u = 1;
+u = 0.3;
 x_dot = u*cos(psi);
 y_dot = u*sin(psi);
 psi_p_prev = 0;
@@ -155,19 +147,41 @@ end
 
 x = state(1,:);
 y = state(2,:);
-yaw = state(3,:);
+psi = state(3,:);
 gamma = state(4,:);
 
 t = times';
 
-% Trajetoria 
+% Trajectory
 plot(x,y)
 axis equal
-hold on 
-plot([1;0]'*pd(t), [0;1]'*pd(t), 'Color', '#A2142F','LineWidth', 1.5)
+hold on
+coelho = pd(gamma0);
+plot(coelho(1), coelho(2), 'Marker', "pentagram", 'MarkerFaceColor', '#A2142F','MarkerSize', 12)
+%plot([1;0]'*pd(t), [0;1]'*pd(t), 'Color', '#A2142F','LineWidth', 1)
 title('Trajectory')
 xlabel("x")
 ylabel("y")
+
+%% gamma moving 
+
+figure;
+coelho = pd(gamma0);
+plot([1;0]'*pd(t), [0;1]'*pd(t), 'Color', '#A2142F','LineWidth', 1)
+axis equal
+hold on
+
+point = plot(coelho(1), coelho(2), "Marker", "pentagram", "MarkerFaceColor", "#0072BD", "MarkerEdgeColor", "#0072BD","MarkerSize", 12);
+for t = 1:50:size(gamma, 2)
+    coelho = pd(gamma(:, t));  
+    set(point, 'XData', coelho(1), 'YData', coelho(2));
+    pause(0.001);
+    hold on;
+end
+
+hold off; 
+
+%%
 
 % Yaw
 figure
@@ -244,7 +258,6 @@ plot(t,V2-cumsum(V2_dot)*ts)
 legend('V2', 'int v2 dot')
 title('Verifing derivative of the Lyapunov function')
 
-
 %% Verifying derivatives of path
 
 % derivative pd
@@ -279,11 +292,3 @@ subplot(1,2,2)
 plot(t,[0;1]'*pd_dot(t), t,[0;1]'*pd_ddot(t), t(2:end),diff([0;1]'*pd_dot(t))./ts,'.')
 legend('y dot','y ddot','diff y dot')
 title('Verifying double derivative of y dot')
-
-%% what is this for
-% plot(t,[2;0]'*pd(t),t,[2;0]'*pd_dot(t),t(2:end),diff([2;0]'*pd(t))./ts,'.')
-% plot(t,[2;0]'*pd_dot(t),t,[2;0]'*pd_ddot(t),t(2:end),diff([2;0]'*pd_dot(t))./ts,'.')
-
-
-
-
