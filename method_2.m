@@ -4,7 +4,8 @@ clear
 close all
 clc
 
-%% Simulation time definition
+%% First part 
+
 ts = 1e-4;
 times = (0:ts:50)';
 
@@ -13,7 +14,7 @@ a = 5;
 pd = @(t) [a*sqrt(2)*cos(t)./(sin(t).^2+1);...
             a*sqrt(2)*cos(t).*sin(t)./(sin(t).^2+1)];
 
-% syms t; pd(t) % derivatives computed symbolocally
+% Derivatives computed symbolocally
 pd_dot = @(t) [                                        - (2.^(1/2).*a.*sin(t))/(sin(t).^2 + 1) - (2*2.^(1/2).*a.*cos(t).^2.*sin(t))/(sin(t).^2 + 1).^2;
                 (2.^(1/2).*a.*cos(t).^2)/(sin(t).^2 + 1) - (2.^(1/2).*a.*sin(t).^2)/(sin(t).^2 + 1) - (2.*2.^(1/2).*a.*cos(t).^2.*sin(t).^2)/(sin(t).^2 + 1).^2];
 
@@ -36,13 +37,48 @@ theta = 0.2;
 k_delta = 1;
 
 delta = @(y1, u) -theta * tanh(k_delta * y1 .* u);
-%delta_dot = @(y1, y1_dot, u, u_dot) -theta * k_delta * (1 - (y1_dot.*u + y1.*u_dot) .* tanh(k_delta .* y1 .* u).^2);
 delta_dot = @(y1, y1_dot, u, u_dot) -k_delta * theta * (sech(k_delta * y1 .* u)).^2 .* (y1_dot .* u + y1 .* u_dot);
 
 k1 = 10;
 k2 = 5;
 k3 = 0.5;
 
+%% Incorporating wind and currents 
+
+X_udot = -21.8;                 % K g
+Y_vdot = -608.1;                % K g
+N_rdot = -364.5;                % K gm^2
+
+m = 400;                        % K g
+
+% inertia momentum around the z_c azis
+Iz = 326;                       % k gm^2
+
+M = diag([(m - X_udot) (m - Y_vdot) (Iz - N_rdot)]);
+
+C = @(r) [0 -m*r 0; m*r 0 0; 0 0 0];
+
+X_u = - 0.5;                    % K gs^-1
+X_usquared = -7.6;              % K gm^-2 s
+Y_vvc = -581.2;                 % K gm^−1
+N_r = -0.26;                    % K gm^2 s^−1
+N_rr = -1764.2;                 % K gm^2
+
+D = @(u, r) diag([(X_u + X_usquared * u) (Y_vvc) (N_r + N_rr * abs(r))]);
+
+acceleration = @(u, v, t) inv(M) * (-C * [u; v; r] - D * [u; v; r]);
+
+%% something 
+
+% valores desejados
+u_d = 2;
+v_d = 0;
+r_d = 2;
+
+for i = 1:length(times)
+
+
+end
 %% Algorithm 
 
 x = 7;
@@ -53,7 +89,7 @@ psi = pi/4;
 gamma = 0.8;
 gamma0 = gamma;
 gamma_dot = 0;
-u = 0.3;
+u = 1;
 x_dot = u*cos(psi);
 y_dot = u*sin(psi);
 psi_p_prev = 0;
@@ -91,16 +127,14 @@ for i = 1:length(times)
     psi_e = psi - psi_p;
 
     % Speed input
-    u = norm(pd_dot(gamma));        % verificar 
-    u_dot = pd_ddot(gamma)' * pd_dot(gamma) * gamma_dot /norm(pd_dot(gamma)); % confirmado 
+    u = norm(pd_dot(gamma));        
+    u_dot = pd_ddot(gamma)' * pd_dot(gamma) * gamma_dot /norm(pd_dot(gamma)); 
 
     % Angular velocity input
     up = u * cos(psi_e) + k3 * s1;
 
-    % up = norm(pd_dot(gamma)) * gamma_dot;
     gamma_dot = up / norm(pd_dot(gamma));
 
-    %y1_dot = u * sin(psi_e) - gamma_dot * s1; % do prof why
     y1_dot = u * sin(psi_e) - s1 * k(gamma) * up;
 
     % Needed to lyapunov
@@ -185,7 +219,7 @@ hold off;
 
 % Yaw
 figure
-plot(t, yaw)
+plot(t, psi)
 title('Vehicle heading, \psi')
 
 % Gamma
