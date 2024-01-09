@@ -66,19 +66,19 @@ N_rr = -1764.2;                 % K gm^2
 
 D = @(u, r) diag([(X_u + X_usquared * u) (Y_vvc) (N_r + N_rr * abs(r))]);
 
-acceleration = @(u, v, t) inv(M) * (-C * [u; v; r] - D * [u; v; r]);
+m_u = m - X_udot;
+m_v = m - Y_vdot;
+m_r = Iz - N_rdot;
 
-%% something 
+d_u = @(u) - X_u - (X_usquared * abs(u)); 
+d_v = @(v) - Y_vvc ; 
+d_r = @(r) - N_r - (N_rr * abs(r)); 
 
-% valores desejados
-u_d = 2;
-v_d = 0;
-r_d = 2;
+% model
+surge_dot = @(tau_u, u) (1/m_u) * (tau_u - d_u(u) * u);
+sway_dot = @(tau_v, v) (1/m_v) * (tau_v - d_v(v) * v);
+yaw_dot = @(tau_r, r) (1/m_r) * (tau_r - d_r(r) * r);
 
-for i = 1:length(times)
-
-
-end
 %% Algorithm 
 
 x = 7;
@@ -147,6 +147,58 @@ for i = 1:length(times)
 
     psi_til_dot = r - k(gamma) * up - delta_dot(y1,y1_dot,u,u_dot);
 
+    %%%%%%%%%%%%%%%%%%%%%% inner loop %%%%%%%%%%%%%%%%%%%%%%
+    dt2 = 0.005;
+    timesin = (0:dt2:5)';
+    veloc = zeros(2, length(timesin));
+
+    u_ref = u; % works
+    r_ref = 2;
+    ref = [u_ref; 0; r_ref]; % valores desejados
+
+    disp(['I am trying to get u = ', num2str(u_ref)]);
+    disp(['I am trying to get r = ', num2str(r_ref)]);
+
+    surge = 0;
+    sway = 0;
+    yaw = 0;
+    current = [surge; sway; yaw];
+
+    tau_u = 0;
+    tau_v = 0;
+    tau_r = 0;
+
+    % ganhos dos controladores
+    kp = 8;
+    kd = 0.9;
+    kp_2 = 0.2;
+    kd_2 = 1;
+
+    for j = 1:length(timesin)
+
+        e = current - ref;
+        e_ponto = [surge_dot(tau_u, surge); sway_dot(tau_v, sway); yaw_dot(tau_r, yaw)];
+        disp(['e(3) = ', num2str(e(3))]);
+        % motores
+        tau_u = d_u(surge) + m_u*(-kp*e(1) - kd*e_ponto(1));
+        tau_v = 0;
+        tau_r = d_r(yaw) + m_r*(-kp_2*e(3) - kd_2*e_ponto(3));
+
+        % atualizar valores 
+        surge = surge + dt2 * surge_dot(tau_u, surge);
+        sway = sway + dt2 * sway_dot(tau_v, sway);
+        yaw = yaw + dt2 * yaw_dot(tau_r, yaw);
+        %disp(['yaw = ', num2str(yaw)]);
+        current = [surge; sway; yaw];
+
+        veloc(:,j) = [surge; yaw];
+
+    end
+    disp(['Final u = ', num2str(surge)]);
+    disp(['Final r = ', num2str(yaw)]);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
     % Vehicle model
     x_dot = u*cos(psi);
     y_dot = u*sin(psi);
@@ -177,6 +229,14 @@ for i = 1:length(times)
 
 end
 
+%% Inner loop controller
+
+u = veloc(1,:); % surge
+r = veloc(2,:); % yaw
+
+t = timesin';
+plot(t,u)
+
 %% Trajectory, psi, gamma 
 
 x = state(1,:);
@@ -191,29 +251,11 @@ plot(x,y)
 axis equal
 hold on
 coelho = pd(gamma0);
-plot(coelho(1), coelho(2), 'Marker', "pentagram", 'MarkerFaceColor', '#A2142F','MarkerSize', 12)
-%plot([1;0]'*pd(t), [0;1]'*pd(t), 'Color', '#A2142F','LineWidth', 1)
+%plot(coelho(1), coelho(2), 'Marker', "pentagram", 'MarkerFaceColor', '#A2142F','MarkerSize', 12)
+plot([1;0]'*pd(t), [0;1]'*pd(t), 'Color', '#A2142F','LineWidth', 1)
 title('Trajectory')
 xlabel("x")
 ylabel("y")
-
-%% gamma moving 
-
-figure;
-coelho = pd(gamma0);
-plot([1;0]'*pd(t), [0;1]'*pd(t), 'Color', '#A2142F','LineWidth', 1)
-axis equal
-hold on
-
-point = plot(coelho(1), coelho(2), "Marker", "pentagram", "MarkerFaceColor", "#0072BD", "MarkerEdgeColor", "#0072BD","MarkerSize", 12);
-for t = 1:50:size(gamma, 2)
-    coelho = pd(gamma(:, t));  
-    set(point, 'XData', coelho(1), 'YData', coelho(2));
-    pause(0.001);
-    hold on;
-end
-
-hold off; 
 
 %%
 
@@ -226,8 +268,6 @@ title('Vehicle heading, \psi')
 figure
 plot(t, gamma)
 title('\gamma')
-
-% clf
 
 s1 = tmp(1,:);
 y1 = tmp(2,:);
@@ -291,38 +331,3 @@ figure
 plot(t,V2-cumsum(V2_dot)*ts)
 legend('V2', 'int v2 dot')
 title('Verifing derivative of the Lyapunov function')
-
-%% Verifying derivatives of path
-
-% derivative pd
-figure
-hold on
-subplot(1,2,1)
-plot(t,[1 0]*pd_dot(t),t,[1 0]*pd_ddot(t),t(2:end),diff([1 0]*pd_dot(t))/ts,'.')
-title('Coordinate x')
-subplot(1,2,2)
-plot(t,[0 1]*pd_dot(t),t,[0 1]*pd_ddot(t),t(2:end),diff([0 1]*pd_dot(t))/ts,'.')
-title('Coordinate y')
-legend('pd dot','pd ddot','diff pd dot', 'Location', 'southeast')
-
-% x coordinate
-figure
-subplot(1,2,1)
-plot(t,[1;0]'*pd(t), t,[1;0]'*pd_dot(t), t(2:end),diff([1;0]'*pd(t))./ts,'.')
-legend('x','x dot','diff x')
-title('Verifying derivative of x')
-subplot(1,2,2)
-plot(t,[1;0]'*pd_dot(t), t,[1;0]'*pd_ddot(t), t(2:end),diff([1;0]'*pd_dot(t))./ts,'.')
-legend('x dot','x ddot','diff x dot')
-title('Verifying double derivative of x')
-
-% y coordinate
-figure
-subplot(1,2,1)
-plot(t,[0;1]'*pd(t), t,[0;1]'*pd_dot(t), t(2:end),diff([0;1]'*pd(t))./ts,'.')
-legend('y','y dot','diff y')
-title('Verifying derivative of y')
-subplot(1,2,2)
-plot(t,[0;1]'*pd_dot(t), t,[0;1]'*pd_ddot(t), t(2:end),diff([0;1]'*pd_dot(t))./ts,'.')
-legend('y dot','y ddot','diff y dot')
-title('Verifying double derivative of y dot')
