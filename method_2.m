@@ -45,24 +45,25 @@ k3 = 0.5;
 
 %% Incorporating wind and currents 
 
-X_udot = -21.8;                 % K g
-Y_vdot = -608.1;                % K g
-N_rdot = -364.5;                % K gm^2
+X_udot = -20;                 % K g
+Y_vdot = -30;                % K g
+N_rdot = -0.5;                % K gm^2
 
-m = 400;                        % K g
+m = 30;                        % K g
 
 % inertia momentum around the z_c azis
-Iz = 326;                       % k gm^2
+Iz = 1;                       % k gm^2
 
 M = diag([(m - X_udot) (m - Y_vdot) (Iz - N_rdot)]);
 
 C = @(r) [0 -m*r 0; m*r 0 0; 0 0 0];
 
-X_u = - 0.5;                    % K gs^-1
-X_usquared = -7.6;              % K gm^-2 s
-Y_vvc = -581.2;                 % K gm^−1
-N_r = -0.26;                    % K gm^2 s^−1
-N_rr = -1764.2;                 % K gm^2
+X_u = - 0.2;                    
+X_uu = -25;              
+Y_v = -55.1;    
+Y_vv = -0.01;    
+N_r = -4.14;                    
+N_rr = -6.23;                 
 
 D = @(u, r) diag([(X_u + X_usquared * u) (Y_vvc) (N_r + N_rr * abs(r))]);
 
@@ -70,9 +71,9 @@ m_u = m - X_udot;
 m_v = m - Y_vdot;
 m_r = Iz - N_rdot;
 
-d_u = @(u) - X_u - (X_usquared * abs(u)); 
-d_v = @(v) - Y_vvc ; 
-d_r = @(r) - N_r - (N_rr * abs(r)); 
+d_u = @(u) - X_u - (X_uu * abs(u)); 
+d_v = @(v) - Y_v - (Y_vv * abs(v)); 
+d_r = @(r) - N_r;
 
 % model
 surge_dot = @(tau_u, u) (1/m_u) * (tau_u - d_u(u) * u);
@@ -148,12 +149,12 @@ for i = 1:length(times)
     psi_til_dot = r - k(gamma) * up - delta_dot(y1,y1_dot,u,u_dot);
 
     %%%%%%%%%%%%%%%%%%%%%% inner loop %%%%%%%%%%%%%%%%%%%%%%
-    dt2 = 0.005;
-    timesin = (0:dt2:5)';
-    veloc = zeros(2, length(timesin));
+    dt_in = 0.005;
+    timesin = (0:dt_in:2)';
+    veloc = zeros(5, length(timesin));
 
     u_ref = u; % works
-    r_ref = 2;
+    r_ref = r;
     ref = [u_ref; 0; r_ref]; % valores desejados
 
     disp(['I am trying to get u = ', num2str(u_ref)]);
@@ -169,33 +170,48 @@ for i = 1:length(times)
     tau_r = 0;
 
     % ganhos dos controladores
-    kp = 8;
+    kp = 36;
     kd = 0.9;
-    kp_2 = 0.2;
-    kd_2 = 1;
+    kp_2 = 130;
+    kd_2 = 0.6;
 
     for j = 1:length(timesin)
 
         e = current - ref;
+        %disp(['e(3) = ', num2str(e(3))]);
         e_ponto = [surge_dot(tau_u, surge); sway_dot(tau_v, sway); yaw_dot(tau_r, yaw)];
-        disp(['e(3) = ', num2str(e(3))]);
+        %disp(['e(3) = ', num2str(e(3))]);
         % motores
         tau_u = d_u(surge) + m_u*(-kp*e(1) - kd*e_ponto(1));
         tau_v = 0;
         tau_r = d_r(yaw) + m_r*(-kp_2*e(3) - kd_2*e_ponto(3));
 
         % atualizar valores 
-        surge = surge + dt2 * surge_dot(tau_u, surge);
-        sway = sway + dt2 * sway_dot(tau_v, sway);
-        yaw = yaw + dt2 * yaw_dot(tau_r, yaw);
-        %disp(['yaw = ', num2str(yaw)]);
+        surge = surge + dt_in * surge_dot(tau_u, surge);
+        sway = sway + dt_in * sway_dot(tau_v, sway);
+        yaw = yaw + dt_in * yaw_dot(tau_r, yaw);
         current = [surge; sway; yaw];
 
-        veloc(:,j) = [surge; yaw];
-
+        veloc(:,j) = [e(3); e_ponto(3); yaw; yaw_dot(tau_r, yaw); d_r(yaw)];
     end
     disp(['Final u = ', num2str(surge)]);
     disp(['Final r = ', num2str(yaw)]);
+    disp(['Final error = ', num2str(yaw - r_ref)]);
+
+    t = timesin';
+    plot(t, veloc(1,:))
+    figure
+    r_vector = r_ref * ones(size(timesin));
+    plot(t, r_vector, 'LineWidth', 2 )
+    hold on
+    plot(t, veloc(3,:))
+    % plot(t, veloc(3,:))
+    % figure
+    % plot(t, veloc(4,:))
+    % figure
+    % plot(t, veloc(5,:))
+    %plot(t, veloc(1,:), t, veloc(2,:), t(2:end),diff(veloc(1,:))/dt_in,'--')
+    %plot(t, veloc(3,:), t, veloc(4,:), t(2:end),diff(veloc(3,:))/dt_in,'--')
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
