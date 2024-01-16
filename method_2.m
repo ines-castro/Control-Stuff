@@ -95,11 +95,6 @@ x_dot = u*cos(psi);
 y_dot = u*sin(psi);
 psi_p_prev = 0;
 
-% % initial inputs
-% u = 1;
-% r = 0.1;
-% gamma_dot = 0;
-
 % state history
 state = zeros(4,length(times));
 tmp = zeros(5,length(times));
@@ -153,7 +148,7 @@ for i = 1:length(times)
     timesin = (0:dt_in:2)';
     veloc = zeros(5, length(timesin));
 
-    u_ref = u; % works
+    u_ref = u; 
     r_ref = r;
     ref = [u_ref; 0; r_ref]; % valores desejados
 
@@ -178,9 +173,8 @@ for i = 1:length(times)
     for j = 1:length(timesin)
 
         e = current - ref;
-        %disp(['e(3) = ', num2str(e(3))]);
         e_ponto = [surge_dot(tau_u, surge); sway_dot(tau_v, sway); yaw_dot(tau_r, yaw)];
-        %disp(['e(3) = ', num2str(e(3))]);
+
         % motores
         tau_u = d_u(surge) + m_u*(-kp*e(1) - kd*e_ponto(1));
         tau_v = 0;
